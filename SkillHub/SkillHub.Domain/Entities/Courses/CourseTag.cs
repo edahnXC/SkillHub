@@ -1,6 +1,8 @@
-﻿namespace SkillHub.SkillHub.Domain.Entities.Courses
+﻿using SkillHub.SkillHub.Domain.Common;
+
+namespace SkillHub.SkillHub.Domain.Entities.Courses;
+
+public class CourseTag : BaseEntity
 {
-    public class COuseTag
-    {
-    }
+    public string Name { get; set; } = string.Empty;
 }

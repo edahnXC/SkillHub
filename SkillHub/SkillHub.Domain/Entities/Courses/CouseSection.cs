@@ -1,6 +1,14 @@
-﻿namespace SkillHub.SkillHub.Domain.Entities.Courses
+﻿using SkillHub.SkillHub.Domain.Common;
+
+namespace SkillHub.SkillHub.Domain.Entities.Courses;
+
+public class CourseSection : BaseEntity
 {
-    public class CouseSection
-    {
-    }
+    public long CourseId { get; set; }
+
+    public string Title { get; set; } = string.Empty;
+
+    public int DisplayOrder { get; set; }
 }
+
+//remaining lesson and resource
