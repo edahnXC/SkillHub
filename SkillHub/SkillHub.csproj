@@ -7,7 +7,23 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="SkillHub.Domain\Entities\Learning\" />
+    <Folder Include="SkillHub.Domain\Entities\Commerce\" />
+    <Folder Include="SkillHub.Domain\Entities\Logging\" />
+    <Folder Include="SkillHub.Domain\Entities\Communication\" />
+    <Folder Include="SkillHub.Domain\Entities\Courses\" />
+    <Folder Include="SkillHub.Domain\Enums\" />
+    <Folder Include="SkillHub.Infrastructure\" />
+    <Folder Include="SkillHub.Application\" />
+    <Folder Include="SkillHub.API\" />
+    <Folder Include="SkillHub.Persistence\Migrations\" />
+    <Folder Include="SkillHub.Persistence\Repositories\" />
   </ItemGroup>
 
 </Project>
