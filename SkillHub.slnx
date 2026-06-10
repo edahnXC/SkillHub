@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="SkillHub.API/SkillHub.API.csproj" Id="358e1068-2e28-4f8f-adef-c23814d83929" />
+  <Project Path="SkillHub.Application/SkillHub.Application.csproj" Id="e6f42295-6a5b-4b2f-ae09-d5cf5152e975" />
+  <Project Path="SkillHub.Domain/SkillHub.Domain.csproj" Id="78d547bf-a84e-4e08-a36e-407b7d974a44" />
+  <Project Path="SkillHub.Infracture/SkillHub.Infrastructure.csproj" Id="a308e910-cf78-4a8a-81a9-1885bc384bf7" />
+  <Project Path="SkillHub/SkillHub.csproj" />
+</Solution>
