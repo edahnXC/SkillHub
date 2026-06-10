@@ -7,4 +7,4 @@ public class CourseTagMapping:BaseEntity
         public long CourseId { get; set; }
         public long TagId { get; set; }
     }
-}
+
