@@ -4,7 +4,7 @@ namespace SkillHub.Domain.Entities.Identity
 {
     public class RolePermission:BaseEntity
     {
-        public int RoleId { get; set; }
+        public long RoleId { get; set; }
 
         public Role Role { get; set; } = null!;
         public long PermissionId { get; set; }

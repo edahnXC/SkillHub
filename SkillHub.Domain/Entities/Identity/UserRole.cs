@@ -9,7 +9,7 @@ namespace SkillHub.Domain.Entities.Identity
         public User User { get; set; }= null!; //userole is the bridge table between user
         //and role so it has a reference to both user and role
 
-        public int RoleId { get; set; }
+        public long RoleId { get; set; }
 
         public Role Role { get; set; } = null!;
 
