@@ -31,8 +31,7 @@ public class Course : AuditableEntity
     { get; set; }
         = new List<CourseSection>();
 
-    public ICollection<CourseTagMapping>
-        CourseTagMappings
+    public ICollection<CourseTagMapping> CourseTagMappings
     { get; set; }
         = new List<CourseTagMapping>();
 }
