@@ -1,4 +1,5 @@
 ﻿using SkillHub.Domain.Common;
+using SkillHub.Domain.Entities.Courses;
 
 namespace SkillHub.Domain.Entities.Identity;
 
@@ -25,4 +26,7 @@ public class User : AuditableEntity
 
     public ICollection<RefreshToken> RefreshTokens { get; set; }
         = new List<RefreshToken>();
+
+    public ICollection<Course> Courses { get; set; }
+        = new List<Course>();
 }

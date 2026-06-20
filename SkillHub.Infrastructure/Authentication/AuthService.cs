@@ -10,10 +10,15 @@ public class AuthService : IAuthService
 {
     private readonly ApplicationDbContext _context;
 
+    private readonly IJwtTokenGenerator _jwtTokenGenerator;
+
     public AuthService(
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IJwtTokenGenerator jwtTokenGenerator)
     {
         _context = context;
+
+        _jwtTokenGenerator=jwtTokenGenerator;
     }
 
     public async Task<AuthResponseDto> RegisterAsync(
@@ -72,7 +77,7 @@ public class AuthService : IAuthService
         {
             Email = user.Email,
             FullName = $"{user.FirstName} {user.LastName}",
-            Token = string.Empty
+            Token = _jwtTokenGenerator.GenerateToken(user)
         };
     }
 }

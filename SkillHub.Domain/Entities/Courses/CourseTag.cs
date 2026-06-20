@@ -5,4 +5,7 @@ namespace SkillHub.Domain.Entities.Courses;
 public class CourseTag : BaseEntity
 {
     public string Name { get; set; } = string.Empty;
+    public ICollection<CourseTagMapping> CourseTagMappings
+    { get; set; } 
+        = new List<CourseTagMapping>();
 }
