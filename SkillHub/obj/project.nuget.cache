@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "WfpiM5aNAWQ=",
+  "dgSpecHash": "+R3e4e6xbdw=",
   "success": true,
-  "projectFilePath": "F:\\Projects\\SkillHub\\SkillHub\\SkillHub.csproj",
+  "projectFilePath": "F:\\Projects\\SkillHub\\Skillhub\\SkillHub.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\omgfo\\.nuget\\packages\\azure.core\\1.25.0\\azure.core.1.25.0.nupkg.sha512",
     "C:\\Users\\omgfo\\.nuget\\packages\\azure.identity\\1.7.0\\azure.identity.1.7.0.nupkg.sha512",

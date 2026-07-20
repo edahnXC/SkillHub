@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "F:\\Projects\\SkillHub\\SkillHub\\SkillHub.csproj": {}
+    "F:\\Projects\\SkillHub\\Skillhub\\SkillHub.csproj": {}
   },
   "projects": {
-    "F:\\Projects\\SkillHub\\SkillHub\\SkillHub.csproj": {
+    "F:\\Projects\\SkillHub\\Skillhub\\SkillHub.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "F:\\Projects\\SkillHub\\SkillHub\\SkillHub.csproj",
+        "projectUniqueName": "F:\\Projects\\SkillHub\\Skillhub\\SkillHub.csproj",
         "projectName": "SkillHub",
-        "projectPath": "F:\\Projects\\SkillHub\\SkillHub\\SkillHub.csproj",
+        "projectPath": "F:\\Projects\\SkillHub\\Skillhub\\SkillHub.csproj",
         "packagesPath": "C:\\Users\\omgfo\\.nuget\\packages\\",
-        "outputPath": "F:\\Projects\\SkillHub\\SkillHub\\obj\\",
+        "outputPath": "F:\\Projects\\SkillHub\\Skillhub\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

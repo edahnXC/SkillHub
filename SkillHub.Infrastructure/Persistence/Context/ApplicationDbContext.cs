@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 using SkillHub.Domain.Entities.Identity;
 using SkillHub.Domain.Entities.Courses;
@@ -30,11 +30,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<RolePermission> RolePermissions
         => Set<RolePermission>();
 
+    public DbSet<RefreshToken> RefreshTokens
+        => Set<RefreshToken>();
 
     // Courses
 
     public DbSet<Course> Courses
         => Set<Course>();
+
+    public DbSet<Enrollment> Enrollments
+        => Set<Enrollment>();
 
     public DbSet<CourseCategory> CourseCategories
         => Set<CourseCategory>();

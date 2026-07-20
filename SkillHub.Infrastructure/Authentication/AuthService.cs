@@ -1,6 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
 using SkillHub.Application.Features.Identity.DTOs;
 using SkillHub.Application.Features.Identity.Interfaces;
+using SkillHub.Application.Features.Identity.Models;
 using SkillHub.Domain.Entities.Identity;
 using SkillHub.Infrastructure.Persistence.Context;
 
@@ -12,13 +17,18 @@ public class AuthService : IAuthService
 
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
 
+    private readonly JwtSettings _jwtSettings;
+
     public AuthService(
         ApplicationDbContext context,
-        IJwtTokenGenerator jwtTokenGenerator)
+        IJwtTokenGenerator jwtTokenGenerator,
+        IOptions<JwtSettings> jwtSettings)
     {
         _context = context;
 
-        _jwtTokenGenerator=jwtTokenGenerator;
+        _jwtTokenGenerator = jwtTokenGenerator;
+
+        _jwtSettings = jwtSettings.Value;
     }
 
     public async Task<AuthResponseDto> RegisterAsync(
@@ -42,13 +52,38 @@ public class AuthService : IAuthService
             IsEmailVerified = false
         };
 
+        var studentRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Student");
+        if (studentRole != null)
+        {
+            user.UserRoles.Add(new UserRole
+            {
+                RoleId = studentRole.Id,
+                User = user
+            });
+        }
+
         await _context.Users.AddAsync(user);
         await _context.SaveChangesAsync();
+
+        // Reload user with roles for JWT generation
+        var registeredUser = await _context.Users
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .FirstAsync(u => u.Id == user.Id);
+
+        var refreshToken = GenerateRefreshToken(registeredUser.Id);
+        await _context.RefreshTokens.AddAsync(refreshToken);
+        await _context.SaveChangesAsync();
+
         return new AuthResponseDto
         {
-            Email = user.Email,
-            FullName = $"{user.FirstName} {user.LastName}",
-            Token = string.Empty
+            Email = registeredUser.Email,
+            FullName = $"{registeredUser.FirstName} {registeredUser.LastName}",
+            Token = _jwtTokenGenerator.GenerateToken(registeredUser),
+            RefreshToken = refreshToken.Token,
+            Roles = registeredUser.UserRoles
+                .Select(ur => ur.Role.Name)
+                .ToList()
         };
 
     }
@@ -56,6 +91,8 @@ public class AuthService : IAuthService
         LoginRequestDto request)
     {
         var user = await _context.Users
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(x => x.Email == request.Email);
 
         if (user == null)
@@ -73,11 +110,104 @@ public class AuthService : IAuthService
             throw new Exception("Invalid credentials.");
         }
 
+        var refreshToken = GenerateRefreshToken(user.Id);
+        await _context.RefreshTokens.AddAsync(refreshToken);
+        await _context.SaveChangesAsync();
+
         return new AuthResponseDto
         {
             Email = user.Email,
             FullName = $"{user.FirstName} {user.LastName}",
-            Token = _jwtTokenGenerator.GenerateToken(user)
+            Token = _jwtTokenGenerator.GenerateToken(user),
+            RefreshToken = refreshToken.Token,
+            Roles = user.UserRoles
+                .Select(ur => ur.Role.Name)
+                .ToList()
+        };
+    }
+
+    public async Task<AuthResponseDto> RefreshTokenAsync(
+        string token)
+    {
+        var existingToken = await _context.RefreshTokens
+            .Include(rt => rt.User)
+            .ThenInclude(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(rt => rt.Token == token);
+
+        if (existingToken == null)
+        {
+            throw new Exception("Invalid refresh token.");
+        }
+
+        if (!existingToken.IsActive)
+        {
+            throw new Exception("Refresh token has expired or been revoked.");
+        }
+
+        // Rotate: revoke the old token and create a new one
+        existingToken.RevokedAt = DateTime.UtcNow;
+        existingToken.ReplacedByToken = null; // will be set below
+
+        var newRefreshToken =
+            GenerateRefreshToken(existingToken.UserId);
+
+        existingToken.ReplacedByToken = newRefreshToken.Token;
+
+        await _context.RefreshTokens.AddAsync(newRefreshToken);
+        await _context.SaveChangesAsync();
+
+        var user = existingToken.User;
+
+        return new AuthResponseDto
+        {
+            Email = user.Email,
+            FullName = $"{user.FirstName} {user.LastName}",
+            Token = _jwtTokenGenerator.GenerateToken(user),
+            RefreshToken = newRefreshToken.Token,
+            Roles = user.UserRoles
+                .Select(ur => ur.Role.Name)
+                .ToList()
+        };
+    }
+
+    public async Task LogoutAsync(string token)
+    {
+        var existingToken = await _context.RefreshTokens
+            .FirstOrDefaultAsync(rt => rt.Token == token);
+
+        if (existingToken == null)
+        {
+            return; // If it's invalid or doesn't exist, they are effectively already logged out
+        }
+
+        if (existingToken.RevokedAt != null)
+        {
+            return; // Already revoked, nothing to do
+        }
+
+        existingToken.RevokedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+    }
+
+    private RefreshToken GenerateRefreshToken(long userId)
+    {
+        var randomBytes = new byte[64];
+
+        using var rng =
+            RandomNumberGenerator.Create();
+
+        rng.GetBytes(randomBytes);
+
+        return new RefreshToken
+        {
+            UserId = userId,
+            Token = Convert.ToBase64String(randomBytes),
+            ExpiresAt = DateTime.UtcNow.AddDays(
+                _jwtSettings.RefreshTokenDurationInDays > 0
+                    ? _jwtSettings.RefreshTokenDurationInDays
+                    : 7),
+            CreatedAt = DateTime.UtcNow
         };
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
@@ -40,6 +40,14 @@ public class JwtTokenGenerator
                     ClaimTypes.Name,
                     $"{user.FirstName} {user.LastName}")
             };
+
+        foreach (var userRole in user.UserRoles)
+        {
+            if (userRole.Role != null)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, userRole.Role.Name));
+            }
+        }
 
         var key =
             new SymmetricSecurityKey(

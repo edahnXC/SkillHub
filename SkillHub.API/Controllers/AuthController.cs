@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SkillHub.Application.Features.Identity.DTOs;
 using SkillHub.Application.Features.Identity.Interfaces;
 
@@ -27,8 +28,33 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login(
         LoginRequestDto request)
     {
-        var result = await _authService.LoginAsync(request);
+        try
+        {
+            var result = await _authService.LoginAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex) when (ex.Message == "Invalid credentials." || ex.Message == "Account is deactivated.")
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh(
+        RefreshTokenRequestDto request)
+    {
+        var result = await _authService
+            .RefreshTokenAsync(request.Token);
         return Ok(result);
+    }
+
+    [HttpPost("logout")]
+    [Authorize]
+    public async Task<IActionResult> Logout(
+        RefreshTokenRequestDto request)
+    {
+        await _authService.LogoutAsync(request.Token);
+        return Ok(new { message = "Logged out successfully." });
     }
 
 }

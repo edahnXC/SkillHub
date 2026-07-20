@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,6 +11,10 @@ namespace SkillHub.Application.Features.Identity.Interfaces
         Task<AuthResponseDto> RegisterAsync(RegisterRequestDto registerRequest);
 
         Task<AuthResponseDto>LoginAsync(LoginRequestDto loginRequest);
+
+        Task<AuthResponseDto> RefreshTokenAsync(string token);
+
+        Task LogoutAsync(string token);
     }
 }
 //application layer need to be independent of the infrastructure layer and the domain layer

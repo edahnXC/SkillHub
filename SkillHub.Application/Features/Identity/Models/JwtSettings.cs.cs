@@ -1,4 +1,4 @@
-﻿namespace SkillHub.Application.Features.Identity.Models;
+namespace SkillHub.Application.Features.Identity.Models;
 
 public class JwtSettings
 {
@@ -11,5 +11,6 @@ public class JwtSettings
     public string Audience { get; set; }
     = string.Empty;
     public int DurationInMinutes { get; set; }
+    public int RefreshTokenDurationInDays { get; set; }
 }
 //this class maps the jwtsettings from appsettings.json

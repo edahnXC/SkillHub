@@ -1,4 +1,4 @@
-﻿using SkillHub.Domain.Common;
+using SkillHub.Domain.Common;
 
 namespace SkillHub.Domain.Entities.Identity;
 
@@ -15,4 +15,9 @@ public class RefreshToken : BaseEntity
     public DateTime? RevokedAt { get; set; }
 
     public string? CreatedByIp { get; set; }
-}
+
+    public string? ReplacedByToken { get; set; }
+
+    public bool IsActive =>
+        RevokedAt == null && DateTime.UtcNow < ExpiresAt;
+}
