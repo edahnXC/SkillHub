@@ -1,6 +1,8 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SkillHub.Application.Features.Admin.Interfaces;
+using SkillHub.Application.Features.Admin.DTOs;
 
 namespace SkillHub.API.Controllers;
 
@@ -26,8 +28,46 @@ public class AdminController : ControllerBase
     [HttpDelete("users/{id}")]
     public async Task<IActionResult> DeleteUser(long id)
     {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var rolesClaim = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+
+        if (!long.TryParse(userIdClaim, out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        // Prevent SuperAdmin from deleting themselves
+        if (rolesClaim.Contains("SuperAdmin") && currentUserId == id)
+        {
+            return BadRequest(new { message = "SuperAdmin cannot delete their own account." });
+        }
+
+        // SubAdmin can only delete their own account (cannot delete others)
+        if (rolesClaim.Contains("SubAdmin") && !rolesClaim.Contains("SuperAdmin"))
+        {
+            if (currentUserId != id)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "SubAdmins can only delete their own account." });
+            }
+        }
+
         await _adminService.DeleteUserAsync(id);
         return NoContent();
+    }
+
+    [HttpPost("create-user")]
+    [Authorize(Roles = "SuperAdmin")]
+    public async Task<IActionResult> CreateUser([FromBody] CreateUserRequestDto request)
+    {
+        try
+        {
+            await _adminService.CreateUserAsync(request);
+            return Ok(new { message = "User created successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpGet("courses")]
@@ -42,5 +82,19 @@ public class AdminController : ControllerBase
     {
         await _adminService.DeleteCourseAsync(id);
         return NoContent();
+    }
+
+    [HttpPost("courses/{id}/approve")]
+    public async Task<IActionResult> ApproveCourse(long id)
+    {
+        try
+        {
+            await _adminService.ApproveCourseAsync(id);
+            return Ok(new { message = "Course approved successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }
