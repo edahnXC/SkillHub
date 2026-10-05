@@ -1,5 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-
 using SkillHub.Application.Features.Identity.Constants;
 using SkillHub.Domain.Entities.Identity;
 using SkillHub.Infrastructure.Persistence.Context;
@@ -8,103 +11,148 @@ namespace SkillHub.Infrastructure.Seed;
 
 public static class PermissionSeeder
 {
-    public static async Task SeedPermissionsAsync(
-        ApplicationDbContext context)
+    public static async Task SeedPermissionsAsync(ApplicationDbContext context)
     {
-        if (await context.Permissions.AnyAsync())
+        // Define all platform permissions
+        var allPermissions = new List<(string Name, string Description)>
         {
-            return;
-        }
+            // UI Navigation Tabs
+            (PermissionConstants.TabsUsersView, "Access Users tab in Admin panel"),
+            (PermissionConstants.TabsCoursesView, "Access Courses tab in Admin panel"),
+            (PermissionConstants.TabsCreateUserView, "Access Create User tab in Admin panel"),
+            (PermissionConstants.TabsRolesAndPermissionsView, "Access Roles & Dynamic Permission Studio tab"),
+            (PermissionConstants.TabsAnalyticsView, "Access Platform Analytics & Reporting tab"),
+            (PermissionConstants.TabsCategoriesView, "Access Category Management tab"),
 
-        // ── Create all permissions ───────────────────
-        var permissions = new List<Permission>
-        {
-            // Course (Instructor)
-            new() { Name = PermissionConstants.CoursesCreate,       Description = "Create new courses" },
-            new() { Name = PermissionConstants.CoursesRead,         Description = "View courses" },
-            new() { Name = PermissionConstants.CoursesUpdate,       Description = "Update own courses" },
-            new() { Name = PermissionConstants.CoursesDelete,       Description = "Delete own courses" },
-
-            // Course Admin (SuperAdmin)
-            new() { Name = PermissionConstants.CoursesForcePublish, Description = "Force publish/unpublish any course" },
-            new() { Name = PermissionConstants.CoursesDeleteAny,    Description = "Delete any course on the platform" },
-            new() { Name = PermissionConstants.CoursesArchive,      Description = "Archive courses" },
+            // Course Management
+            (PermissionConstants.CoursesCreate, "Create new courses"),
+            (PermissionConstants.CoursesRead, "View published courses"),
+            (PermissionConstants.CoursesUpdate, "Update own courses"),
+            (PermissionConstants.CoursesDelete, "Delete own courses"),
+            (PermissionConstants.CoursesForcePublish, "Force publish or unpublish any course"),
+            (PermissionConstants.CoursesDeleteAny, "Delete any course across platform"),
+            (PermissionConstants.CoursesArchive, "Archive courses"),
+            (PermissionConstants.CoursesApprove, "Approve submitted courses"),
 
             // User Management
-            new() { Name = PermissionConstants.UsersView,           Description = "View all user profiles" },
-            new() { Name = PermissionConstants.UsersSuspend,        Description = "Suspend/unsuspend user accounts" },
-            new() { Name = PermissionConstants.UsersDelete,         Description = "Permanently delete user accounts" },
-            new() { Name = PermissionConstants.UsersResetPassword,  Description = "Reset any user's password" },
+            (PermissionConstants.UsersView, "View user lists and detailed profiles"),
+            (PermissionConstants.UsersCreate, "Create administrative and standard accounts"),
+            (PermissionConstants.UsersSuspend, "Suspend or unsuspend user accounts"),
+            (PermissionConstants.UsersDelete, "Permanently delete user accounts"),
+            (PermissionConstants.UsersResetPassword, "Reset any user password"),
 
-            // Category & Tag Management
-            new() { Name = PermissionConstants.CategoriesManage,    Description = "Create/edit/delete course categories" },
-            new() { Name = PermissionConstants.TagsManage,          Description = "Create/edit/delete course tags" },
+            // Categories & Tags
+            (PermissionConstants.CategoriesManage, "Create, edit, and delete course categories"),
+            (PermissionConstants.TagsManage, "Create, edit, and delete course tags"),
 
-            // Role & Admin Management
-            new() { Name = PermissionConstants.RolesManage,         Description = "Manage roles and assign permissions" },
-            new() { Name = PermissionConstants.AdminsManage,        Description = "Create/remove admin accounts" },
+            // Roles & Permissions
+            (PermissionConstants.RolesManage, "Manage roles and dynamic permission matrix"),
+            (PermissionConstants.PermissionsManage, "Assign and revoke granular permissions"),
+            (PermissionConstants.AdminsManage, "Create and manage admin staff"),
 
-            // Instructor Management
-            new() { Name = PermissionConstants.InstructorsView,     Description = "View instructor list and details" },
-            new() { Name = PermissionConstants.InstructorsApprove,  Description = "Approve/reject instructor applications" }
+            // Instructors
+            (PermissionConstants.InstructorsView, "View instructor directory and earnings"),
+            (PermissionConstants.InstructorsApprove, "Approve or reject instructor applications"),
+
+            // Quizzes & Assessments
+            (PermissionConstants.QuizzesManage, "Create and manage course quizzes"),
+            (PermissionConstants.QuizzesTake, "Take course quizzes and receive certificates"),
+
+            // Reviews
+            (PermissionConstants.ReviewsWrite, "Write and submit course reviews"),
+            (PermissionConstants.ReviewsModerate, "Moderate and delete inappropriate reviews"),
+
+            // Support & Helpdesk
+            (PermissionConstants.TabsSupportView, "Access Support & Helpdesk tab in Admin panel"),
+            (PermissionConstants.SupportViewAll, "View all platform support tickets"),
+            (PermissionConstants.SupportReply, "Reply to tickets and post internal staff notes"),
+            (PermissionConstants.SupportAssign, "Assign support tickets to staff members"),
+            (PermissionConstants.SupportStatusChange, "Change ticket status (Resolve, Close, In-Progress)")
         };
 
-        await context.Permissions.AddRangeAsync(permissions);
+        foreach (var (name, desc) in allPermissions)
+        {
+            var existing = await context.Permissions.FirstOrDefaultAsync(p => p.Name == name);
+            if (existing == null)
+            {
+                context.Permissions.Add(new Permission
+                {
+                    Name = name,
+                    Description = desc,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+        }
         await context.SaveChangesAsync();
 
-        // ── Fetch roles by name ──────────────────────
         var superAdminRole  = await context.Roles.FirstOrDefaultAsync(r => r.Name == "SuperAdmin");
         var subAdminRole    = await context.Roles.FirstOrDefaultAsync(r => r.Name == "SubAdmin");
         var instructorRole  = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Instructor");
         var studentRole     = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Student");
 
-        // Build lookup: permission name → Id
-        var permLookup = await context.Permissions
-            .ToDictionaryAsync(p => p.Name, p => p.Id);
+        var permLookup = await context.Permissions.ToDictionaryAsync(p => p.Name, p => p.Id);
 
-        var rolePermissions = new List<RolePermission>();
-
-        // ── SuperAdmin → ALL permissions ─────────────
+        // SuperAdmin -> ALL Permissions
         if (superAdminRole != null)
         {
-            foreach (var permId in permLookup.Values)
+            foreach (var perm in permLookup)
             {
-                rolePermissions.Add(new RolePermission
+                var hasRp = await context.RolePermissions.AnyAsync(rp => rp.RoleId == superAdminRole.Id && rp.PermissionId == perm.Value);
+                if (!hasRp)
                 {
-                    RoleId = superAdminRole.Id,
-                    PermissionId = permId
-                });
-            }
-        }
-
-        // ── SubAdmin → operational subset ────────────
-        // Cannot: delete users permanently, change roles, change pricing, delete courses permanently
-        if (subAdminRole != null)
-        {
-            var subAdminPerms = new[]
-            {
-                PermissionConstants.CoursesRead,
-                PermissionConstants.CoursesArchive,
-                PermissionConstants.UsersView,
-                PermissionConstants.UsersSuspend,
-                PermissionConstants.InstructorsView,
-                PermissionConstants.InstructorsApprove
-            };
-
-            foreach (var permName in subAdminPerms)
-            {
-                if (permLookup.TryGetValue(permName, out var permId))
-                {
-                    rolePermissions.Add(new RolePermission
+                    context.RolePermissions.Add(new RolePermission
                     {
-                        RoleId = subAdminRole.Id,
-                        PermissionId = permId
+                        RoleId = superAdminRole.Id,
+                        PermissionId = perm.Value,
+                        CreatedAt = DateTime.UtcNow
                     });
                 }
             }
         }
 
-        // ── Instructor → course CRUD ─────────────────
+        // SubAdmin -> Operations Subset (Users Tab, Courses Tab, Categories, Approvals)
+        if (subAdminRole != null)
+        {
+            var subAdminPerms = new[]
+            {
+                PermissionConstants.TabsUsersView,
+                PermissionConstants.TabsCoursesView,
+                PermissionConstants.TabsCategoriesView,
+                PermissionConstants.CoursesRead,
+                PermissionConstants.CoursesArchive,
+                PermissionConstants.CoursesApprove,
+                PermissionConstants.UsersView,
+                PermissionConstants.UsersSuspend,
+                PermissionConstants.CategoriesManage,
+                PermissionConstants.InstructorsView,
+                PermissionConstants.InstructorsApprove,
+                PermissionConstants.ReviewsModerate,
+                PermissionConstants.TabsSupportView,
+                PermissionConstants.SupportViewAll,
+                PermissionConstants.SupportReply,
+                PermissionConstants.SupportAssign,
+                PermissionConstants.SupportStatusChange
+            };
+
+            foreach (var pName in subAdminPerms)
+            {
+                if (permLookup.TryGetValue(pName, out var pid))
+                {
+                    var hasRp = await context.RolePermissions.AnyAsync(rp => rp.RoleId == subAdminRole.Id && rp.PermissionId == pid);
+                    if (!hasRp)
+                    {
+                        context.RolePermissions.Add(new RolePermission
+                        {
+                            RoleId = subAdminRole.Id,
+                            PermissionId = pid,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+        }
+
+        // Instructor -> Course CRUD, Quizzes
         if (instructorRole != null)
         {
             var instructorPerms = new[]
@@ -112,36 +160,56 @@ public static class PermissionSeeder
                 PermissionConstants.CoursesCreate,
                 PermissionConstants.CoursesRead,
                 PermissionConstants.CoursesUpdate,
-                PermissionConstants.CoursesDelete
+                PermissionConstants.CoursesDelete,
+                PermissionConstants.QuizzesManage
             };
 
-            foreach (var permName in instructorPerms)
+            foreach (var pName in instructorPerms)
             {
-                if (permLookup.TryGetValue(permName, out var permId))
+                if (permLookup.TryGetValue(pName, out var pid))
                 {
-                    rolePermissions.Add(new RolePermission
+                    var hasRp = await context.RolePermissions.AnyAsync(rp => rp.RoleId == instructorRole.Id && rp.PermissionId == pid);
+                    if (!hasRp)
                     {
-                        RoleId = instructorRole.Id,
-                        PermissionId = permId
-                    });
+                        context.RolePermissions.Add(new RolePermission
+                        {
+                            RoleId = instructorRole.Id,
+                            PermissionId = pid,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
                 }
             }
         }
 
-        // ── Student → read-only ──────────────────────
+        // Student -> Course Read, Quizzes Take, Reviews Write
         if (studentRole != null)
         {
-            if (permLookup.TryGetValue(PermissionConstants.CoursesRead, out var readPermId))
+            var studentPerms = new[]
             {
-                rolePermissions.Add(new RolePermission
+                PermissionConstants.CoursesRead,
+                PermissionConstants.QuizzesTake,
+                PermissionConstants.ReviewsWrite
+            };
+
+            foreach (var pName in studentPerms)
+            {
+                if (permLookup.TryGetValue(pName, out var pid))
                 {
-                    RoleId = studentRole.Id,
-                    PermissionId = readPermId
-                });
+                    var hasRp = await context.RolePermissions.AnyAsync(rp => rp.RoleId == studentRole.Id && rp.PermissionId == pid);
+                    if (!hasRp)
+                    {
+                        context.RolePermissions.Add(new RolePermission
+                        {
+                            RoleId = studentRole.Id,
+                            PermissionId = pid,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
             }
         }
 
-        await context.RolePermissions.AddRangeAsync(rolePermissions);
         await context.SaveChangesAsync();
     }
 }

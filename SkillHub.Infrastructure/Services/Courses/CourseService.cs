@@ -35,6 +35,8 @@ public class CourseService : ICourseService
     public async Task<List<CourseListDto>> GetAllAsync()
     {
         return await _context.Courses
+            .Where(c => c.IsPublished)
+            .OrderByDescending(c => c.CreatedAt)
             .ProjectTo<CourseListDto>(_mapper.ConfigurationProvider)
             .ToListAsync();
     }

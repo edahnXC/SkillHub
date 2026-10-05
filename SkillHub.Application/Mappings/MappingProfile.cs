@@ -18,13 +18,19 @@ public class MappingProfile : Profile
         CreateMap<Enrollment, CourseListDto>()
             .ForMember(d => d.Id, o => o.MapFrom(s => s.Course.Id))
             .ForMember(d => d.Title, o => o.MapFrom(s => s.Course.Title))
+            .ForMember(d => d.Description, o => o.MapFrom(s => s.Course.Description))
             .ForMember(d => d.Price, o => o.MapFrom(s => s.Course.Price))
+            .ForMember(d => d.DiscountPrice, o => o.MapFrom(s => s.Course.DiscountPrice))
             .ForMember(d => d.ThumbnailUrl, o => o.MapFrom(s => s.Course.ThumbnailUrl))
             .ForMember(d => d.IsPublished, o => o.MapFrom(s => s.Course.IsPublished))
-            .ForMember(d => d.InstructorId, o => o.MapFrom(s => s.Course.InstructorId));
+            .ForMember(d => d.InstructorId, o => o.MapFrom(s => s.Course.InstructorId))
+            .ForMember(d => d.CategoryName, o => o.MapFrom(s => s.Course.Category.Name))
+            .ForMember(d => d.InstructorName, o => o.MapFrom(s => s.Course.Instructor.FirstName + " " + s.Course.Instructor.LastName));
 
         // ── Course → CourseListDto (flat, for grids) ─
-        CreateMap<Course, CourseListDto>();
+        CreateMap<Course, CourseListDto>()
+            .ForMember(d => d.CategoryName, o => o.MapFrom(s => s.Category.Name))
+            .ForMember(d => d.InstructorName, o => o.MapFrom(s => s.Instructor.FirstName + " " + s.Instructor.LastName));
 
         // ── Course → CourseResponseDto (detail view) ─
         CreateMap<Course, CourseResponseDto>()

@@ -82,6 +82,8 @@ using (var scope = app.Services.CreateScope())
     await UserSeeder.SeedUsersAsync(context);
 
     await CourseCategorySeeder.SeedCategoriesAsync(context);
+
+    await CourseSeeder.SeedCoursesAsync(context);
 }
 
 // ==============================

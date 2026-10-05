@@ -1,8 +1,13 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using Microsoft.EntityFrameworkCore;
 using SkillHub.Application.Features.Admin.DTOs;
 using SkillHub.Application.Features.Admin.Interfaces;
+using SkillHub.Domain.Entities.Identity;
 using SkillHub.Infrastructure.Persistence.Context;
 
 namespace SkillHub.Infrastructure.Services.Admin;
@@ -20,19 +25,33 @@ public class AdminService : IAdminService
 
     public async Task<IEnumerable<AdminUserDto>> GetAllUsersAsync()
     {
-        return await _context.Users
+        var users = await _context.Users
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
+            .Include(u => u.UserPermissions)
+                .ThenInclude(up => up.Permission)
             .OrderBy(u => u.FirstName)
             .ThenBy(u => u.LastName)
-            .ProjectTo<AdminUserDto>(_mapper.ConfigurationProvider)
             .ToListAsync();
+
+        return users.Select(u => new AdminUserDto
+        {
+            Id = u.Id,
+            FirstName = u.FirstName,
+            LastName = u.LastName,
+            Email = u.Email,
+            IsActive = u.IsActive,
+            CreatedAt = u.CreatedAt,
+            Roles = u.UserRoles.Select(ur => ur.Role.Name).ToList(),
+            Permissions = u.UserPermissions.Where(up => up.IsGranted).Select(up => up.Permission.Name).ToList()
+        });
     }
 
     public async Task DeleteUserAsync(long id)
     {
         var user = await _context.Users
             .Include(u => u.UserRoles)
+            .Include(u => u.UserPermissions)
             .Include(u => u.RefreshTokens)
             .Include(u => u.Courses)
             .FirstOrDefaultAsync(u => u.Id == id);
@@ -78,13 +97,12 @@ public class AdminService : IAdminService
             throw new Exception($"Role '{dto.Role}' not found.");
         }
 
-        // Restrict role creation to SubAdmin, Instructor, or Student (never allow creating SuperAdmins administratively)
         if (dto.Role != "SubAdmin" && dto.Role != "Instructor" && dto.Role != "Student")
         {
             throw new Exception("Invalid role specified.");
         }
 
-        var user = new SkillHub.Domain.Entities.Identity.User
+        var user = new User
         {
             FirstName = dto.FirstName,
             LastName = dto.LastName,
@@ -95,9 +113,30 @@ public class AdminService : IAdminService
             CreatedAt = DateTime.UtcNow
         };
 
-        user.UserRoles.Add(new SkillHub.Domain.Entities.Identity.UserRole { RoleId = role.Id, User = user });
+        user.UserRoles.Add(new UserRole { RoleId = role.Id, User = user });
         await _context.Users.AddAsync(user);
         await _context.SaveChangesAsync();
+
+        // If specific permissions were selected for this SubAdmin, save them to UserPermissions
+        if (dto.PermissionIds != null && dto.PermissionIds.Count > 0)
+        {
+            var distinctIds = dto.PermissionIds.Distinct().ToList();
+            var validIds = await _context.Permissions
+                .Where(p => distinctIds.Contains(p.Id))
+                .Select(p => p.Id)
+                .ToListAsync();
+
+            var userPerms = validIds.Select(pid => new UserPermission
+            {
+                UserId = user.Id,
+                PermissionId = pid,
+                IsGranted = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.UserPermissions.AddRangeAsync(userPerms);
+            await _context.SaveChangesAsync();
+        }
     }
 
     public async Task ApproveCourseAsync(long id)
