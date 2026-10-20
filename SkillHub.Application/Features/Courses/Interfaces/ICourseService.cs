@@ -19,4 +19,6 @@ public interface ICourseService
 
     Task DeleteAsync(
         long id, long instructorId);
+
+    Task<PlatformStatsDto> GetPlatformStatsAsync();
 }

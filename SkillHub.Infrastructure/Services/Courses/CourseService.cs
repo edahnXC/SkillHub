@@ -89,4 +89,52 @@ public class CourseService : ICourseService
         _context.Courses.Remove(course);
         await _context.SaveChangesAsync();
     }
+
+    public async Task<PlatformStatsDto> GetPlatformStatsAsync()
+    {
+        var coursesCount = await _context.Courses.CountAsync(c => c.IsPublished);
+        if (coursesCount == 0)
+        {
+            coursesCount = await _context.Courses.CountAsync();
+        }
+
+        var instructorsCount = await _context.Users
+            .CountAsync(u => u.UserRoles.Any(ur => ur.Role.Name == "Instructor"));
+        if (instructorsCount == 0)
+        {
+            instructorsCount = await _context.Courses
+                .Select(c => c.InstructorId)
+                .Distinct()
+                .CountAsync();
+        }
+
+        var enrolledStudentsCount = await _context.Enrollments
+            .Select(e => e.StudentId)
+            .Distinct()
+            .CountAsync();
+
+        var totalEnrollments = await _context.Enrollments.CountAsync();
+
+        var studentUsersCount = await _context.Users
+            .CountAsync(u => u.UserRoles.Any(ur => ur.Role.Name == "Student"));
+
+        var studentsCount = enrolledStudentsCount > 0 ? enrolledStudentsCount : studentUsersCount;
+
+        var hasReviews = await _context.CourseReviews.AnyAsync();
+        double avgRating = 4.8;
+        if (hasReviews)
+        {
+            var rawAvg = await _context.CourseReviews.AverageAsync(r => (double)r.Rating);
+            avgRating = Math.Round(rawAvg, 1);
+        }
+
+        return new PlatformStatsDto
+        {
+            CoursesCount = coursesCount,
+            InstructorsCount = instructorsCount,
+            StudentsCount = studentsCount,
+            TotalEnrollments = totalEnrollments,
+            AverageRating = avgRating
+        };
+    }
 }

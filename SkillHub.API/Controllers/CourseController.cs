@@ -10,20 +10,16 @@ namespace SkillHub.API.Controllers;
 [Route("api/[controller]")]
 public class CourseController : ControllerBase
 {
-    private readonly ICourseService
-        _courseService;
+    private readonly ICourseService _courseService;
 
-    public CourseController(
-        ICourseService courseService)
+    public CourseController(ICourseService courseService)
     {
         _courseService = courseService;
     }
 
     [HttpPost]
     [Authorize(Roles = "Instructor")]
-    public async Task<IActionResult>
-        Create(
-            CreateCourseRequestDto request)
+    public async Task<IActionResult> Create(CreateCourseRequestDto request)
     {
         var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (!long.TryParse(userIdClaim, out var instructorId))
@@ -31,35 +27,31 @@ public class CourseController : ControllerBase
             return Unauthorized("User ID not found or invalid.");
         }
 
-        var result =
-            await _courseService
-                .CreateAsync(request, instructorId);
-
+        var result = await _courseService.CreateAsync(request, instructorId);
         return Ok(result);
     }
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult>
-        GetAll()
+    public async Task<IActionResult> GetAll()
     {
-        var result =
-            await _courseService
-                .GetAllAsync();
-
+        var result = await _courseService.GetAllAsync();
         return Ok(result);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("platform-stats")]
     [AllowAnonymous]
-    public async Task<IActionResult>
-        GetById(
-            long id)
+    public async Task<IActionResult> GetPlatformStats()
     {
-        var result =
-            await _courseService
-                .GetByIdAsync(id);
+        var result = await _courseService.GetPlatformStatsAsync();
+        return Ok(result);
+    }
 
+    [HttpGet("{id:long}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetById(long id)
+    {
+        var result = await _courseService.GetByIdAsync(id);
         if (result == null)
         {
             return NotFound();
@@ -78,9 +70,7 @@ public class CourseController : ControllerBase
 
     [HttpPut]
     [Authorize(Roles = "Instructor")]
-    public async Task<IActionResult>
-        Update(
-            UpdateCourseRequestDto request)
+    public async Task<IActionResult> Update(UpdateCourseRequestDto request)
     {
         var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (!long.TryParse(userIdClaim, out var instructorId))
@@ -99,11 +89,9 @@ public class CourseController : ControllerBase
         }
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:long}")]
     [Authorize(Roles = "Instructor")]
-    public async Task<IActionResult>
-        Delete(
-            long id)
+    public async Task<IActionResult> Delete(long id)
     {
         var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (!long.TryParse(userIdClaim, out var instructorId))
@@ -122,5 +110,3 @@ public class CourseController : ControllerBase
         }
     }
 }
-//list of instructors in grid
-//search instructors by name, email, or expertise
