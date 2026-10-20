@@ -15,6 +15,11 @@ namespace SkillHub.Application.Features.Learning.DTOs
         public int TotalLessonsCount { get; set; }
         public List<LearningSectionDto> Sections { get; set; } = new();
         public CertificateDto? Certificate { get; set; }
+        public bool IsCertificateEligible { get; set; }
+        public string? CertificateRequirementMessage { get; set; }
+        public int TotalQuizzesCount { get; set; }
+        public int PassedQuizzesCount { get; set; }
+        public decimal? AverageAssessmentScore { get; set; }
     }
 
     public class LearningSectionDto
@@ -43,6 +48,9 @@ namespace SkillHub.Application.Features.Learning.DTOs
         public DateTime IssuedAt { get; set; }
         public string StudentName { get; set; } = string.Empty;
         public string CourseTitle { get; set; } = string.Empty;
+        public string InstructorName { get; set; } = string.Empty;
+        public decimal? FinalScore { get; set; }
+        public string? Grade { get; set; }
     }
 
     public class ToggleLessonCompletionRequestDto
@@ -61,5 +69,7 @@ namespace SkillHub.Application.Features.Learning.DTOs
         public int TotalLessonsCount { get; set; }
         public bool IsCourseCompleted { get; set; }
         public CertificateDto? Certificate { get; set; }
+        public bool IsCertificateEligible { get; set; }
+        public string? CertificateRequirementMessage { get; set; }
     }
 }

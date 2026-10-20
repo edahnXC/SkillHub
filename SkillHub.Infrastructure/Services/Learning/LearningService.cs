@@ -58,8 +58,11 @@ namespace SkillHub.Infrastructure.Services.Learning
                     ? Math.Round(((decimal)completedCount / totalLessons) * 100, 1) 
                     : 0;
 
+                var (isCertEligible, certRequirementMessage, avgScore, certGrade, totalQuizzes, passedQuizzes) = 
+                    await EvaluateCertificateEligibilityAsync(userId, courseId, completedCount, totalLessons);
+
                 CertificateDto? certDto = null;
-                if (progressPercentage >= 100 && totalLessons > 0)
+                if (isCertEligible)
                 {
                     var cert = await _context.Certificates
                         .FirstOrDefaultAsync(c => c.StudentId == userId && c.CourseId == courseId);
@@ -83,7 +86,10 @@ namespace SkillHub.Infrastructure.Services.Learning
                         CertificateNumber = cert.CertificateNumber,
                         IssuedAt = cert.IssuedAt,
                         StudentName = $"{enrollment.Student.FirstName} {enrollment.Student.LastName}",
-                        CourseTitle = course.Title
+                        CourseTitle = course.Title,
+                        InstructorName = instructorName,
+                        FinalScore = avgScore,
+                        Grade = certGrade
                     };
                 }
 
@@ -97,6 +103,11 @@ namespace SkillHub.Infrastructure.Services.Learning
                     CompletedLessonsCount = completedCount,
                     TotalLessonsCount = totalLessons,
                     Certificate = certDto,
+                    IsCertificateEligible = isCertEligible,
+                    CertificateRequirementMessage = certRequirementMessage,
+                    TotalQuizzesCount = totalQuizzes,
+                    PassedQuizzesCount = passedQuizzes,
+                    AverageAssessmentScore = avgScore,
                     Sections = sections.Select(s => new LearningSectionDto
                     {
                         Id = s.Id,
@@ -191,6 +202,34 @@ namespace SkillHub.Infrastructure.Services.Learning
 
             if (enrollment == null)
             {
+                var userRoles = await _context.UserRoles
+                    .Where(ur => ur.UserId == studentId)
+                    .Select(ur => ur.Role.Name)
+                    .ToListAsync();
+                var course = await _context.Courses.FirstOrDefaultAsync(c => c.Id == dto.CourseId);
+                bool isPrivileged = userRoles.Contains("SuperAdmin") || userRoles.Contains("SubAdmin") || (course != null && course.InstructorId == studentId);
+
+                if (isPrivileged || (course != null && (course.Price == 0 || course.DiscountPrice == 0)))
+                {
+                    enrollment = new SkillHub.Domain.Entities.Courses.Enrollment
+                    {
+                        StudentId = studentId,
+                        CourseId = dto.CourseId,
+                        EnrolledAt = DateTime.UtcNow,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.Enrollments.Add(enrollment);
+                    await _context.SaveChangesAsync();
+
+                    enrollment = await _context.Enrollments
+                        .Include(e => e.Student)
+                        .Include(e => e.Course)
+                        .FirstOrDefaultAsync(e => e.StudentId == studentId && e.CourseId == dto.CourseId);
+                }
+            }
+
+            if (enrollment == null)
+            {
                 throw new UnauthorizedAccessException("You are not enrolled in this course.");
             }
 
@@ -234,8 +273,11 @@ namespace SkillHub.Infrastructure.Services.Learning
 
             bool isCourseNowCompleted = completedLessons >= totalLessons && totalLessons > 0;
 
+            var (isCertEligible, certRequirementMessage, avgScore, certGrade, totalQuizzes, passedQuizzes) = 
+                await EvaluateCertificateEligibilityAsync(studentId, dto.CourseId, completedLessons, totalLessons);
+
             CertificateDto? certDto = null;
-            if (isCourseNowCompleted)
+            if (isCertEligible)
             {
                 var cert = await _context.Certificates
                     .FirstOrDefaultAsync(c => c.StudentId == studentId && c.CourseId == dto.CourseId);
@@ -254,12 +296,19 @@ namespace SkillHub.Infrastructure.Services.Learning
                     await _context.SaveChangesAsync();
                 }
 
+                var instructorName = enrollment.Course.Instructor != null 
+                    ? $"{enrollment.Course.Instructor.FirstName} {enrollment.Course.Instructor.LastName}" 
+                    : "Expert Instructor";
+
                 certDto = new CertificateDto
                 {
                     CertificateNumber = cert.CertificateNumber,
                     IssuedAt = cert.IssuedAt,
                     StudentName = $"{enrollment.Student.FirstName} {enrollment.Student.LastName}",
-                    CourseTitle = enrollment.Course.Title
+                    CourseTitle = enrollment.Course.Title,
+                    InstructorName = instructorName,
+                    FinalScore = avgScore,
+                    Grade = certGrade
                 };
             }
 
@@ -271,8 +320,70 @@ namespace SkillHub.Infrastructure.Services.Learning
                 CompletedLessonsCount = completedLessons,
                 TotalLessonsCount = totalLessons,
                 IsCourseCompleted = isCourseNowCompleted,
-                Certificate = certDto
+                Certificate = certDto,
+                IsCertificateEligible = isCertEligible,
+                CertificateRequirementMessage = certRequirementMessage
             };
+        }
+
+        private async Task<(bool isEligible, string message, decimal? avgScore, string grade, int totalQuizzes, int passedQuizzes)> EvaluateCertificateEligibilityAsync(long studentId, long courseId, int completedLessons, int totalLessons)
+        {
+            var quizzes = await _context.Quizzes
+                .Where(q => q.CourseId == courseId)
+                .ToListAsync();
+
+            int totalQuizzes = quizzes.Count;
+            int passedQuizzes = 0;
+            decimal totalScore = 0;
+            bool allQuizzesPassed = true;
+            string pendingQuizReason = string.Empty;
+
+            if (totalQuizzes > 0)
+            {
+                foreach (var quiz in quizzes)
+                {
+                    var bestAttempt = await _context.QuizAttempts
+                        .Where(a => a.QuizId == quiz.Id && a.StudentId == studentId)
+                        .OrderByDescending(a => a.ScorePercentage)
+                        .FirstOrDefaultAsync();
+
+                    int requiredScore = quiz.PassingScorePercentage > 0 ? quiz.PassingScorePercentage : 70;
+                    if (bestAttempt != null && bestAttempt.ScorePercentage >= 70 && bestAttempt.ScorePercentage >= requiredScore)
+                    {
+                        passedQuizzes++;
+                        totalScore += bestAttempt.ScorePercentage;
+                    }
+                    else
+                    {
+                        allQuizzesPassed = false;
+                        if (bestAttempt == null)
+                        {
+                            pendingQuizReason = $"Mastery assessment '{quiz.Title}' must be completed with 70% or higher.";
+                        }
+                        else
+                        {
+                            pendingQuizReason = $"Assessment score is {bestAttempt.ScorePercentage}%. 70% or higher is required to unlock your certificate.";
+                        }
+                    }
+                }
+            }
+
+            bool allLessonsCompleted = totalLessons > 0 && completedLessons >= totalLessons;
+
+            if (!allLessonsCompleted)
+            {
+                return (false, $"Complete all lectures ({completedLessons}/{totalLessons} completed) to unlock your certificate.", null, string.Empty, totalQuizzes, passedQuizzes);
+            }
+
+            if (totalQuizzes > 0 && !allQuizzesPassed)
+            {
+                return (false, pendingQuizReason, null, string.Empty, totalQuizzes, passedQuizzes);
+            }
+
+            decimal? avgScore = totalQuizzes > 0 ? Math.Round(totalScore / totalQuizzes, 1) : 100m;
+            string grade = avgScore >= 90 ? "Passed with Highest Distinction" : (avgScore >= 80 ? "Passed with Distinction" : "Passed (≥70%)");
+
+            return (true, "Eligible for official certificate of completion.", avgScore, grade, totalQuizzes, passedQuizzes);
         }
     }
 }

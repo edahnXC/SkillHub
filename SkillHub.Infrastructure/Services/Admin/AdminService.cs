@@ -47,6 +47,30 @@ public class AdminService : IAdminService
         });
     }
 
+    public async Task<AdminUserDto?> GetUserByIdAsync(long id)
+    {
+        var u = await _context.Users
+            .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+            .Include(u => u.UserPermissions)
+                .ThenInclude(up => up.Permission)
+            .FirstOrDefaultAsync(u => u.Id == id);
+
+        if (u == null) return null;
+
+        return new AdminUserDto
+        {
+            Id = u.Id,
+            FirstName = u.FirstName,
+            LastName = u.LastName,
+            Email = u.Email,
+            IsActive = u.IsActive,
+            CreatedAt = u.CreatedAt,
+            Roles = u.UserRoles.Select(ur => ur.Role.Name).ToList(),
+            Permissions = u.UserPermissions.Where(up => up.IsGranted).Select(up => up.Permission.Name).ToList()
+        };
+    }
+
     public async Task DeleteUserAsync(long id)
     {
         var user = await _context.Users

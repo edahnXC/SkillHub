@@ -53,6 +53,8 @@ namespace SkillHub.Application.Features.Assessments.DTOs
         public int PassingScorePercentage { get; set; }
         public DateTime CompletedAt { get; set; }
         public List<QuestionFeedbackDto> QuestionFeedback { get; set; } = new();
+        public bool IsCertificateAwarded { get; set; }
+        public SkillHub.Application.Features.Learning.DTOs.CertificateDto? Certificate { get; set; }
     }
 
     public class QuestionFeedbackDto

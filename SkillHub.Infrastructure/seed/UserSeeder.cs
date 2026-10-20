@@ -105,6 +105,36 @@ public static class UserSeeder
             }
         }
 
+        // ── Product Support ───────────────────────────
+        var supportRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "ProductSupport");
+        if (supportRole != null)
+        {
+            var existing = await context.Users.FirstOrDefaultAsync(u => u.Email == "support@skillhub.com");
+            if (existing != null)
+            {
+                existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Support123!");
+                if (!await context.UserRoles.AnyAsync(ur => ur.UserId == existing.Id && ur.RoleId == supportRole.Id))
+                {
+                    existing.UserRoles.Add(new UserRole { RoleId = supportRole.Id, User = existing });
+                }
+            }
+            else
+            {
+                var user = new User
+                {
+                    FirstName = "Product",
+                    LastName = "Support",
+                    Email = "support@skillhub.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Support123!"),
+                    IsActive = true,
+                    IsEmailVerified = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+                user.UserRoles.Add(new UserRole { RoleId = supportRole.Id, User = user });
+                await context.Users.AddAsync(user);
+            }
+        }
+
         await context.SaveChangesAsync();
     }
 }

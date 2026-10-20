@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SkillHub.Application.Features.Support.DTOs;
 using SkillHub.Application.Features.Support.Interfaces;
@@ -27,7 +28,7 @@ public class SupportController : ControllerBase
 
     private bool IsStaff()
     {
-        return User.IsInRole("SuperAdmin") || User.IsInRole("SubAdmin");
+        return User.IsInRole("SuperAdmin") || User.IsInRole("SubAdmin") || User.IsInRole("ProductSupport");
     }
 
     [HttpPost("tickets")]
@@ -66,12 +67,22 @@ public class SupportController : ControllerBase
         var userId = GetUserId();
         if (userId == 0) return Unauthorized();
 
+        // SuperAdmins have read-only oversight across platform support tickets
+        if (User.IsInRole("SuperAdmin"))
+        {
+            var ticketCheck = await _supportService.GetTicketDetailAsync(id, userId, true);
+            if (ticketCheck.UserId != userId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "SuperAdmins have read-only oversight on support tickets and cannot post replies." });
+            }
+        }
+
         var message = await _supportService.AddMessageAsync(id, userId, dto, IsStaff());
         return Ok(message);
     }
 
     [HttpGet("admin/queue")]
-    [Authorize(Roles = "SuperAdmin,SubAdmin")]
+    [Authorize(Roles = "SuperAdmin,SubAdmin,ProductSupport")]
     public async Task<IActionResult> GetAdminQueue(
         [FromQuery] string? status,
         [FromQuery] string? priority,
@@ -84,18 +95,37 @@ public class SupportController : ControllerBase
     }
 
     [HttpPut("admin/tickets/{id}/status")]
-    [Authorize(Roles = "SuperAdmin,SubAdmin")]
+    [Authorize(Roles = "SubAdmin,ProductSupport,SuperAdmin")]
     public async Task<IActionResult> UpdateTicketStatus(long id, [FromBody] UpdateTicketStatusRequestDto dto)
     {
+        if (User.IsInRole("SuperAdmin"))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "SuperAdmins have read-only oversight and cannot modify ticket status." });
+        }
+
         var adminId = GetUserId();
         var ticket = await _supportService.UpdateStatusAsync(id, dto.Status, adminId);
         return Ok(ticket);
     }
 
+    [HttpGet("admin/assignable-admins")]
+    [Authorize(Roles = "SuperAdmin,SubAdmin,ProductSupport")]
+    public async Task<IActionResult> GetAssignableAdmins([FromServices] SkillHub.Application.Features.Admin.Interfaces.IAdminService adminService)
+    {
+        var users = await adminService.GetAllUsersAsync();
+        var admins = users.Where(u => u.Roles.Contains("SuperAdmin") || u.Roles.Contains("SubAdmin")).ToList();
+        return Ok(admins);
+    }
+
     [HttpPut("admin/tickets/{id}/assign")]
-    [Authorize(Roles = "SuperAdmin,SubAdmin")]
+    [Authorize(Roles = "ProductSupport,SuperAdmin,SubAdmin")]
     public async Task<IActionResult> AssignTicket(long id, [FromBody] AssignTicketRequestDto dto)
     {
+        if (!User.IsInRole("ProductSupport"))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Ticket assignment is exclusively managed by Product Support." });
+        }
+
         var adminId = GetUserId();
         var ticket = await _supportService.AssignTicketAsync(id, dto.AssignedAdminId, adminId);
         return Ok(ticket);

@@ -5,6 +5,7 @@ namespace SkillHub.Application.Features.Admin.Interfaces;
 public interface IAdminService
 {
     Task<IEnumerable<AdminUserDto>> GetAllUsersAsync();
+    Task<AdminUserDto?> GetUserByIdAsync(long id);
     Task DeleteUserAsync(long id);
     Task CreateUserAsync(CreateUserRequestDto dto);
 

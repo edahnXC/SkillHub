@@ -16,7 +16,8 @@ public static class RoleSeeder
             ("SuperAdmin", "Platform owner — unrestricted access to everything"),
             ("SubAdmin", "Operational admin — delegated tasks with restrictions"),
             ("Instructor", "Course Instructor — creates and manages own courses"),
-            ("Student", "Platform Student — browses and enrolls in courses")
+            ("Student", "Platform Student — browses and enrolls in courses"),
+            ("ProductSupport", "Product Support Agent — manages helpdesk, triage, resolution, and assigns tickets to admins")
         };
 
         foreach (var (name, desc) in standardRoles)

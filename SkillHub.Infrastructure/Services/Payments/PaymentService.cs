@@ -46,55 +46,62 @@ public class PaymentService : IPaymentService
 
         var secretKey = GetStripeSecretKey();
 
-        // If valid Stripe key is configured, create live Stripe Checkout Session
+        // If valid Stripe key is configured, attempt to create live Stripe Checkout Session
         if (!string.IsNullOrWhiteSpace(secretKey) && !secretKey.Contains("YOUR_STRIPE_SECRET_KEY"))
         {
-            StripeConfiguration.ApiKey = secretKey;
-
-            var options = new SessionCreateOptions
+            try
             {
-                PaymentMethodTypes = new List<string> { "card" },
-                LineItems = new List<SessionLineItemOptions>
+                StripeConfiguration.ApiKey = secretKey;
+
+                var options = new SessionCreateOptions
                 {
-                    new SessionLineItemOptions
+                    PaymentMethodTypes = new List<string> { "card" },
+                    LineItems = new List<SessionLineItemOptions>
                     {
-                        PriceData = new SessionLineItemPriceDataOptions
+                        new SessionLineItemOptions
                         {
-                            UnitAmount = (long)(priceToCharge * 100), // convert to paisa/cents integer
-                            Currency = "inr",
-                            ProductData = new SessionLineItemPriceDataProductDataOptions
+                            PriceData = new SessionLineItemPriceDataOptions
                             {
-                                Name = course.Title,
-                                Description = course.Description.Length > 200 
-                                    ? course.Description.Substring(0, 197) + "..." 
-                                    : course.Description,
-                                Images = !string.IsNullOrWhiteSpace(course.ThumbnailUrl) 
-                                    ? new List<string> { course.ThumbnailUrl } 
-                                    : null
-                            }
-                        },
-                        Quantity = 1
+                                UnitAmount = (long)(priceToCharge * 100), // convert to paisa/cents integer
+                                Currency = "inr",
+                                ProductData = new SessionLineItemPriceDataProductDataOptions
+                                {
+                                    Name = course.Title,
+                                    Description = course.Description.Length > 200 
+                                        ? course.Description.Substring(0, 197) + "..." 
+                                        : course.Description,
+                                    Images = !string.IsNullOrWhiteSpace(course.ThumbnailUrl) 
+                                        ? new List<string> { course.ThumbnailUrl } 
+                                        : null
+                                }
+                            },
+                            Quantity = 1
+                        }
+                    },
+                    Mode = "payment",
+                    SuccessUrl = dto.SuccessUrl.Contains("?") 
+                        ? dto.SuccessUrl + "&session_id={CHECKOUT_SESSION_ID}" 
+                        : dto.SuccessUrl + "?session_id={CHECKOUT_SESSION_ID}",
+                    CancelUrl = dto.CancelUrl,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        { "studentId", studentId.ToString() },
+                        { "courseId", course.Id.ToString() }
                     }
-                },
-                Mode = "payment",
-                SuccessUrl = dto.SuccessUrl.Contains("?") 
-                    ? dto.SuccessUrl + "&session_id={CHECKOUT_SESSION_ID}" 
-                    : dto.SuccessUrl + "?session_id={CHECKOUT_SESSION_ID}",
-                CancelUrl = dto.CancelUrl,
-                Metadata = new Dictionary<string, string>
-                {
-                    { "studentId", studentId.ToString() },
-                    { "courseId", course.Id.ToString() }
-                }
-            };
+                };
 
-            var service = new SessionService();
-            Session session = await service.CreateAsync(options);
+                var service = new SessionService();
+                Session session = await service.CreateAsync(options);
 
-            return new CheckoutSessionResponseDto(session.Url, session.Id);
+                return new CheckoutSessionResponseDto(session.Url, session.Id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[PaymentService] Stripe Checkout creation error ({ex.Message}). Falling back to Developer Mock Session.");
+            }
         }
 
-        // Developer Fallback / Test Mode when keys are not configured yet
+        // Developer Fallback / Test Mode when keys are not configured or invalid
         var mockSessionId = $"mock_session_{course.Id}_{studentId}_{Guid.NewGuid():N}";
         var mockSuccessUrl = dto.SuccessUrl.Contains("?") 
             ? dto.SuccessUrl + $"&session_id={mockSessionId}" 
@@ -127,23 +134,31 @@ public class PaymentService : IPaymentService
         {
             // Verify with Stripe API
             var secretKey = GetStripeSecretKey();
-            if (string.IsNullOrWhiteSpace(secretKey))
+            if (string.IsNullOrWhiteSpace(secretKey) || secretKey.Contains("YOUR_STRIPE_SECRET_KEY"))
             {
                 return (false, "Stripe secret key configuration is missing", null);
             }
 
-            StripeConfiguration.ApiKey = secretKey;
-            var service = new SessionService();
-            Session session = await service.GetAsync(dto.SessionId);
-
-            if (session == null || session.PaymentStatus != "paid")
+            try
             {
-                return (false, "Payment has not been completed or verified", null);
+                StripeConfiguration.ApiKey = secretKey;
+                var service = new SessionService();
+                Session session = await service.GetAsync(dto.SessionId);
+
+                if (session == null || session.PaymentStatus != "paid")
+                {
+                    return (false, "Payment has not been completed or verified", null);
+                }
+
+                if (session.Metadata != null && session.Metadata.TryGetValue("courseId", out var courseIdStr))
+                {
+                    long.TryParse(courseIdStr, out courseId);
+                }
             }
-
-            if (session.Metadata != null && session.Metadata.TryGetValue("courseId", out var courseIdStr))
+            catch (Exception ex)
             {
-                long.TryParse(courseIdStr, out courseId);
+                Console.WriteLine($"[PaymentService] Stripe Verification error ({ex.Message})");
+                return (false, $"Payment verification failed: {ex.Message}", null);
             }
         }
 

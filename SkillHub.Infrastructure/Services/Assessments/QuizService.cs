@@ -159,6 +159,30 @@ namespace SkillHub.Infrastructure.Services.Assessments
 
             if (!isEnrolled)
             {
+                var userRoles = await _context.UserRoles
+                    .Where(ur => ur.UserId == studentId)
+                    .Select(ur => ur.Role.Name)
+                    .ToListAsync();
+                var course = await _context.Courses.FirstOrDefaultAsync(c => c.Id == quiz.CourseId);
+                bool isPrivileged = userRoles.Contains("SuperAdmin") || userRoles.Contains("SubAdmin") || (course != null && course.InstructorId == studentId);
+
+                if (isPrivileged || (course != null && (course.Price == 0 || course.DiscountPrice == 0)))
+                {
+                    var autoEnrollment = new SkillHub.Domain.Entities.Courses.Enrollment
+                    {
+                        StudentId = studentId,
+                        CourseId = quiz.CourseId,
+                        EnrolledAt = DateTime.UtcNow,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.Enrollments.Add(autoEnrollment);
+                    await _context.SaveChangesAsync();
+                    isEnrolled = true;
+                }
+            }
+
+            if (!isEnrolled)
+            {
                 throw new UnauthorizedAccessException("You must be enrolled in this course to take this quiz.");
             }
 
@@ -224,6 +248,92 @@ namespace SkillHub.Infrastructure.Services.Assessments
             _context.QuizAttempts.Add(attempt);
             await _context.SaveChangesAsync();
 
+            bool isCertificateAwarded = false;
+            SkillHub.Application.Features.Learning.DTOs.CertificateDto? awardedCertDto = null;
+
+            if (scorePercentage >= 70 && isPassed)
+            {
+                var totalLessons = await _context.CourseSections
+                    .Where(s => s.CourseId == quiz.CourseId)
+                    .SelectMany(s => s.Lessons)
+                    .CountAsync();
+
+                var completedLessons = await _context.LessonCompletions
+                    .Where(lc => lc.StudentId == studentId && lc.CourseId == quiz.CourseId)
+                    .CountAsync();
+
+                if (totalLessons > 0 && completedLessons >= totalLessons)
+                {
+                    var courseQuizzes = await _context.Quizzes
+                        .Where(q => q.CourseId == quiz.CourseId)
+                        .ToListAsync();
+
+                    bool allPassed = true;
+                    decimal sumScore = 0;
+                    foreach (var q in courseQuizzes)
+                    {
+                        if (q.Id == quiz.Id)
+                        {
+                            sumScore += scorePercentage;
+                            continue;
+                        }
+
+                        var bestOther = await _context.QuizAttempts
+                            .Where(a => a.QuizId == q.Id && a.StudentId == studentId)
+                            .OrderByDescending(a => a.ScorePercentage)
+                            .FirstOrDefaultAsync();
+
+                        if (bestOther == null || bestOther.ScorePercentage < 70)
+                        {
+                            allPassed = false;
+                            break;
+                        }
+                        sumScore += bestOther.ScorePercentage;
+                    }
+
+                    if (allPassed)
+                    {
+                        var cert = await _context.Certificates
+                            .FirstOrDefaultAsync(c => c.StudentId == studentId && c.CourseId == quiz.CourseId);
+
+                        if (cert == null)
+                        {
+                            var certCode = $"SKILLHUB-CERT-{Guid.NewGuid().ToString("N")[..8].ToUpper()}";
+                            cert = new SkillHub.Domain.Entities.Learning.Certificate
+                            {
+                                StudentId = studentId,
+                                CourseId = quiz.CourseId,
+                                CertificateNumber = certCode,
+                                IssuedAt = DateTime.UtcNow
+                            };
+                            _context.Certificates.Add(cert);
+                            await _context.SaveChangesAsync();
+                        }
+
+                        var user = await _context.Users.FindAsync(studentId);
+                        var course = await _context.Courses.Include(c => c.Instructor).FirstOrDefaultAsync(c => c.Id == quiz.CourseId);
+                        var instructorName = course?.Instructor != null 
+                            ? $"{course.Instructor.FirstName} {course.Instructor.LastName}" 
+                            : "Expert Instructor";
+
+                        decimal avgScore = courseQuizzes.Count > 0 ? Math.Round(sumScore / courseQuizzes.Count, 1) : scorePercentage;
+                        string grade = avgScore >= 90 ? "Passed with Highest Distinction" : (avgScore >= 80 ? "Passed with Distinction" : "Passed (≥70%)");
+
+                        awardedCertDto = new SkillHub.Application.Features.Learning.DTOs.CertificateDto
+                        {
+                            CertificateNumber = cert.CertificateNumber,
+                            IssuedAt = cert.IssuedAt,
+                            StudentName = user != null ? $"{user.FirstName} {user.LastName}" : "Student",
+                            CourseTitle = course?.Title ?? "SkillHub Course",
+                            InstructorName = instructorName,
+                            FinalScore = avgScore,
+                            Grade = grade
+                        };
+                        isCertificateAwarded = true;
+                    }
+                }
+            }
+
             return new QuizAttemptResultDto
             {
                 AttemptId = attempt.Id,
@@ -234,7 +344,9 @@ namespace SkillHub.Infrastructure.Services.Assessments
                 IsPassed = isPassed,
                 PassingScorePercentage = quiz.PassingScorePercentage,
                 CompletedAt = attempt.CompletedAt,
-                QuestionFeedback = feedbackList
+                QuestionFeedback = feedbackList,
+                IsCertificateAwarded = isCertificateAwarded,
+                Certificate = awardedCertDto
             };
         }
 
@@ -248,7 +360,14 @@ namespace SkillHub.Infrastructure.Services.Assessments
 
             if (course.InstructorId != instructorId)
             {
-                throw new UnauthorizedAccessException("You are not authorized to add quizzes to this course.");
+                var userRoles = await _context.UserRoles
+                    .Where(ur => ur.UserId == instructorId)
+                    .Select(ur => ur.Role.Name)
+                    .ToListAsync();
+                if (!userRoles.Contains("SuperAdmin") && !userRoles.Contains("SubAdmin"))
+                {
+                    throw new UnauthorizedAccessException("You are not authorized to add quizzes to this course.");
+                }
             }
 
             var quiz = new Quiz

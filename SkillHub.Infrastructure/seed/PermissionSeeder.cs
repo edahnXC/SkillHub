@@ -92,11 +92,22 @@ public static class PermissionSeeder
 
         var permLookup = await context.Permissions.ToDictionaryAsync(p => p.Name, p => p.Id);
 
-        // SuperAdmin -> ALL Permissions
+        // SuperAdmin -> ALL Permissions EXCEPT ticket mutation/assignment (SuperAdmin is Read-Only Oversight on Support)
         if (superAdminRole != null)
         {
             foreach (var perm in permLookup)
             {
+                // SuperAdmin has read-only oversight on support: no assign, status change, or staff reply
+                if (perm.Key is PermissionConstants.SupportAssign or PermissionConstants.SupportStatusChange or PermissionConstants.SupportReply)
+                {
+                    var existingRp = await context.RolePermissions.FirstOrDefaultAsync(rp => rp.RoleId == superAdminRole.Id && rp.PermissionId == perm.Value);
+                    if (existingRp != null)
+                    {
+                        context.RolePermissions.Remove(existingRp);
+                    }
+                    continue;
+                }
+
                 var hasRp = await context.RolePermissions.AnyAsync(rp => rp.RoleId == superAdminRole.Id && rp.PermissionId == perm.Value);
                 if (!hasRp)
                 {
@@ -110,9 +121,16 @@ public static class PermissionSeeder
             }
         }
 
-        // SubAdmin -> Operations Subset (Users Tab, Courses Tab, Categories, Approvals)
+        // SubAdmin -> Operations Subset (Users Tab, Courses Tab, Categories, Approvals, Solve Assigned Tickets)
         if (subAdminRole != null)
         {
+            // Remove SupportAssign if present (only Product Support assigns tickets)
+            if (permLookup.TryGetValue(PermissionConstants.SupportAssign, out var assignPid))
+            {
+                var assignRp = await context.RolePermissions.FirstOrDefaultAsync(rp => rp.RoleId == subAdminRole.Id && rp.PermissionId == assignPid);
+                if (assignRp != null) context.RolePermissions.Remove(assignRp);
+            }
+
             var subAdminPerms = new[]
             {
                 PermissionConstants.TabsUsersView,
@@ -130,7 +148,6 @@ public static class PermissionSeeder
                 PermissionConstants.TabsSupportView,
                 PermissionConstants.SupportViewAll,
                 PermissionConstants.SupportReply,
-                PermissionConstants.SupportAssign,
                 PermissionConstants.SupportStatusChange
             };
 
@@ -144,6 +161,37 @@ public static class PermissionSeeder
                         context.RolePermissions.Add(new RolePermission
                         {
                             RoleId = subAdminRole.Id,
+                            PermissionId = pid,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+        }
+
+        // ProductSupport -> Helpdesk Command (ViewAll, Assign to Admins, Reply, StatusChange)
+        var productSupportRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "ProductSupport");
+        if (productSupportRole != null)
+        {
+            var supportPerms = new[]
+            {
+                PermissionConstants.TabsSupportView,
+                PermissionConstants.SupportViewAll,
+                PermissionConstants.SupportReply,
+                PermissionConstants.SupportAssign,
+                PermissionConstants.SupportStatusChange
+            };
+
+            foreach (var pName in supportPerms)
+            {
+                if (permLookup.TryGetValue(pName, out var pid))
+                {
+                    var hasRp = await context.RolePermissions.AnyAsync(rp => rp.RoleId == productSupportRole.Id && rp.PermissionId == pid);
+                    if (!hasRp)
+                    {
+                        context.RolePermissions.Add(new RolePermission
+                        {
+                            RoleId = productSupportRole.Id,
                             PermissionId = pid,
                             CreatedAt = DateTime.UtcNow
                         });

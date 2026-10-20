@@ -56,7 +56,7 @@ namespace SkillHub.API.Controllers
         }
 
         [HttpPost("toggle-completion")]
-        [Authorize(Roles = "Student")]
+        [Authorize]
         public async Task<IActionResult> ToggleCompletion([FromBody] ToggleLessonCompletionRequestDto dto)
         {
             var studentId = GetUserId();

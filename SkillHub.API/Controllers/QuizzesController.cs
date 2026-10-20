@@ -49,7 +49,7 @@ namespace SkillHub.API.Controllers
         }
 
         [HttpPost("submit")]
-        [Authorize(Roles = "Student")]
+        [Authorize]
         public async Task<IActionResult> SubmitQuizAttempt([FromBody] SubmitQuizAttemptRequestDto dto)
         {
             var userId = GetCurrentUserId();
@@ -75,7 +75,7 @@ namespace SkillHub.API.Controllers
         }
 
         [HttpPost("create")]
-        [Authorize(Roles = "Instructor")]
+        [Authorize(Roles = "Instructor,SuperAdmin,SubAdmin")]
         public async Task<IActionResult> CreateQuiz([FromBody] CreateQuizRequestDto dto)
         {
             var instructorId = GetCurrentUserId();

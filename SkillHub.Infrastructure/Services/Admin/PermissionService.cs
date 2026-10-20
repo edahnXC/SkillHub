@@ -55,7 +55,7 @@ namespace SkillHub.Infrastructure.Services.Admin
                 Description = r.Description,
                 PermissionsCount = r.RolePermissions.Count,
                 UsersCount = r.UserRoles.Count,
-                IsSystemRole = r.Name is "SuperAdmin" or "SubAdmin" or "Instructor" or "Student"
+                IsSystemRole = r.Name is "SuperAdmin" or "SubAdmin" or "Instructor" or "Student" or "ProductSupport" or "ProductSupport"
             }).ToList();
 
             var categoryGroups = permissions

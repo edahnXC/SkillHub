@@ -36,19 +36,34 @@ public class AdminController : ControllerBase
             return Unauthorized();
         }
 
-        // Prevent SuperAdmin from deleting themselves
+        var targetUser = await _adminService.GetUserByIdAsync(id);
+        if (targetUser == null)
+        {
+            return NotFound(new { message = "User not found." });
+        }
+
+        // Prevent deleting SuperAdmin accounts entirely
+        if (targetUser.Roles.Contains("SuperAdmin"))
+        {
+            return BadRequest(new { message = "SuperAdmin accounts cannot be deleted." });
+        }
+
+        // Prevent SuperAdmin from deleting their own account
         if (rolesClaim.Contains("SuperAdmin") && currentUserId == id)
         {
             return BadRequest(new { message = "SuperAdmin cannot delete their own account." });
         }
 
-        // SubAdmin can only delete their own account (cannot delete others)
-        if (rolesClaim.Contains("SubAdmin") && !rolesClaim.Contains("SuperAdmin"))
+        // SubAdmins cannot delete other administrators (SubAdmin or SuperAdmin)
+        // Only SuperAdmin has the permission to delete SubAdmins
+        bool isTargetAdmin = targetUser.Roles.Contains("SubAdmin") || targetUser.Roles.Contains("SuperAdmin");
+        bool isCallerSuperAdmin = rolesClaim.Contains("SuperAdmin");
+
+        if (isTargetAdmin && !isCallerSuperAdmin)
         {
-            if (currentUserId != id)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, new { message = "SubAdmins can only delete their own account." });
-            }
+            return StatusCode(StatusCodes.Status403Forbidden, new { 
+                message = "SubAdmins do not have permission to delete any administrator. Only the SuperAdmin can delete SubAdmins." 
+            });
         }
 
         await _adminService.DeleteUserAsync(id);

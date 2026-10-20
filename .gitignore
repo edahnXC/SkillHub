@@ -8,3 +8,4 @@ obj/
 node_modules/
 
 wwwroot/uploads/
+appsettings.Development.json
