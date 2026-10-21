@@ -77,6 +77,7 @@ public class AuthService : IAuthService
 
         return new AuthResponseDto
         {
+            UserId = registeredUser.Id,
             Email = registeredUser.Email,
             FullName = $"{registeredUser.FirstName} {registeredUser.LastName}",
             Token = _jwtTokenGenerator.GenerateToken(registeredUser),
@@ -116,6 +117,7 @@ public class AuthService : IAuthService
 
         return new AuthResponseDto
         {
+            UserId = user.Id,
             Email = user.Email,
             FullName = $"{user.FirstName} {user.LastName}",
             Token = _jwtTokenGenerator.GenerateToken(user),
@@ -161,6 +163,7 @@ public class AuthService : IAuthService
 
         return new AuthResponseDto
         {
+            UserId = user.Id,
             Email = user.Email,
             FullName = $"{user.FirstName} {user.LastName}",
             Token = _jwtTokenGenerator.GenerateToken(user),

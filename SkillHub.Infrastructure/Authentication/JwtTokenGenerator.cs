@@ -32,6 +32,9 @@ public class JwtTokenGenerator
                     ClaimTypes.NameIdentifier,
                     user.Id.ToString()),
 
+                new("sub", user.Id.ToString()),
+                new("nameid", user.Id.ToString()),
+
                 new(
                     ClaimTypes.Email,
                     user.Email),

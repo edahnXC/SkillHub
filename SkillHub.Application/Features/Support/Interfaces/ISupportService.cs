@@ -12,5 +12,6 @@ public interface ISupportService
     Task<TicketMessageDto> AddMessageAsync(long ticketId, long userId, AddTicketMessageRequestDto dto, bool isStaff);
     Task<List<SupportTicketDto>> GetAllTicketsAsync(string? status, string? priority, string? category, long? assignedToId, string? search);
     Task<SupportTicketDto> UpdateStatusAsync(long ticketId, string status, long adminId);
+    Task<SupportTicketDto> UpdatePriorityAsync(long ticketId, string priority, long adminId);
     Task<SupportTicketDto> AssignTicketAsync(long ticketId, long? assignedAdminId, long adminId);
 }

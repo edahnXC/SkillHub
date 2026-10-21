@@ -77,6 +77,26 @@ public class SupportController : ControllerBase
             }
         }
 
+        // SubAdmins can only post replies to tickets assigned to them (or if they opened the ticket)
+        if (User.IsInRole("SubAdmin") && !User.IsInRole("ProductSupport"))
+        {
+            var ticketCheck = await _supportService.GetTicketDetailAsync(id, userId, true);
+            if (ticketCheck.AssignedAdminId != userId && ticketCheck.UserId != userId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "SubAdmins can only reply to tickets assigned to them." });
+            }
+        }
+
+        // SubAdmins can only post replies to tickets assigned to them (or if they opened the ticket)
+        if (User.IsInRole("SubAdmin") && !User.IsInRole("ProductSupport"))
+        {
+            var ticketCheck = await _supportService.GetTicketDetailAsync(id, userId, true);
+            if (ticketCheck.AssignedAdminId != userId && ticketCheck.UserId != userId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "SubAdmins can only reply to tickets assigned to them." });
+            }
+        }
+
         var message = await _supportService.AddMessageAsync(id, userId, dto, IsStaff());
         return Ok(message);
     }
@@ -94,6 +114,30 @@ public class SupportController : ControllerBase
         return Ok(tickets);
     }
 
+        [HttpPut("admin/tickets/{id}/priority")]
+    [Authorize(Roles = "ProductSupport,SubAdmin")]
+    public async Task<IActionResult> UpdateTicketPriority(long id, [FromBody] UpdateTicketPriorityRequestDto dto)
+    {
+        if (User.IsInRole("SuperAdmin"))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "SuperAdmins have read-only oversight and cannot modify ticket priority." });
+        }
+
+        var adminId = GetUserId();
+
+        if (User.IsInRole("SubAdmin") && !User.IsInRole("ProductSupport"))
+        {
+            var ticketCheck = await _supportService.GetTicketDetailAsync(id, adminId, true);
+            if (ticketCheck.AssignedAdminId != adminId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "SubAdmins can only modify priority for tickets assigned to them." });
+            }
+        }
+
+        var ticket = await _supportService.UpdatePriorityAsync(id, dto.Priority, adminId);
+        return Ok(ticket);
+    }
+
     [HttpPut("admin/tickets/{id}/status")]
     [Authorize(Roles = "SubAdmin,ProductSupport,SuperAdmin")]
     public async Task<IActionResult> UpdateTicketStatus(long id, [FromBody] UpdateTicketStatusRequestDto dto)
@@ -104,6 +148,17 @@ public class SupportController : ControllerBase
         }
 
         var adminId = GetUserId();
+
+        // When assigned to a SubAdmin, only the assigned SubAdmin (or ProductSupport) can update the ticket status
+        if (User.IsInRole("SubAdmin") && !User.IsInRole("ProductSupport"))
+        {
+            var ticketCheck = await _supportService.GetTicketDetailAsync(id, adminId, true);
+            if (ticketCheck.AssignedAdminId != adminId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "SubAdmins can only update the status of tickets assigned to them." });
+            }
+        }
+
         var ticket = await _supportService.UpdateStatusAsync(id, dto.Status, adminId);
         return Ok(ticket);
     }
@@ -113,7 +168,8 @@ public class SupportController : ControllerBase
     public async Task<IActionResult> GetAssignableAdmins([FromServices] SkillHub.Application.Features.Admin.Interfaces.IAdminService adminService)
     {
         var users = await adminService.GetAllUsersAsync();
-        var admins = users.Where(u => u.Roles.Contains("SuperAdmin") || u.Roles.Contains("SubAdmin")).ToList();
+        // SuperAdmins are strictly read-only viewers and cannot be assigned tickets; only SubAdmins are assignable
+        var admins = users.Where(u => u.Roles.Contains("SubAdmin") && !u.Roles.Contains("SuperAdmin")).ToList();
         return Ok(admins);
     }
 

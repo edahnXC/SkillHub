@@ -40,6 +40,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [HttpPost("refresh-token")]
     public async Task<IActionResult> Refresh(
         RefreshTokenRequestDto request)
     {
@@ -49,7 +50,8 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
-    [Authorize]
+    [HttpPost("revoke-token")]
+    [AllowAnonymous]
     public async Task<IActionResult> Logout(
         RefreshTokenRequestDto request)
     {

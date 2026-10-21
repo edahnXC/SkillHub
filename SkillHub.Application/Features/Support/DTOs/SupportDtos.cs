@@ -19,6 +19,11 @@ public class AddTicketMessageRequestDto
     public string? AttachmentUrl { get; set; }
 }
 
+public class UpdateTicketPriorityRequestDto
+{
+    public string Priority { get; set; } = string.Empty;
+}
+
 public class UpdateTicketStatusRequestDto
 {
     public string Status { get; set; } = string.Empty;

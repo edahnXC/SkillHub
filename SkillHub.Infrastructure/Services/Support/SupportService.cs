@@ -48,7 +48,7 @@ public class SupportService : ISupportService
             UserId = userId,
             Subject = dto.Subject.Trim(),
             Category = string.IsNullOrWhiteSpace(dto.Category) ? "GeneralInquiry" : dto.Category.Trim(),
-            Priority = string.IsNullOrWhiteSpace(dto.Priority) ? "Medium" : dto.Priority.Trim(),
+            Priority = "Normal", // Initial triage status assigned automatically; Product Support assigns final urgency/priority
             Status = "Open",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -334,6 +334,41 @@ public class SupportService : ISupportService
         };
     }
 
+    public async Task<SupportTicketDto> UpdatePriorityAsync(long ticketId, string priority, long adminId)
+    {
+        var ticket = await _context.SupportTickets
+            .Include(t => t.User)
+            .Include(t => t.AssignedAdmin)
+            .FirstOrDefaultAsync(t => t.Id == ticketId);
+
+        if (ticket == null)
+            throw new KeyNotFoundException($"Support ticket {ticketId} not found.");
+
+        ticket.Priority = priority.Trim();
+        ticket.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return new SupportTicketDto
+        {
+            Id = ticket.Id,
+            TicketNumber = ticket.TicketNumber,
+            UserId = ticket.UserId,
+            UserName = ticket.User != null ? $"{ticket.User.FirstName} {ticket.User.LastName}" : string.Empty,
+            UserEmail = ticket.User?.Email ?? string.Empty,
+            Subject = ticket.Subject,
+            Category = ticket.Category,
+            Priority = ticket.Priority,
+            Status = ticket.Status,
+            AssignedAdminId = ticket.AssignedAdminId,
+            AssignedAdminName = ticket.AssignedAdmin != null ? $"{ticket.AssignedAdmin.FirstName} {ticket.AssignedAdmin.LastName}" : null,
+            CreatedAt = ticket.CreatedAt,
+            UpdatedAt = ticket.UpdatedAt,
+            ResolvedAt = ticket.ResolvedAt,
+            MessagesCount = await _context.TicketMessages.CountAsync(m => m.TicketId == ticket.Id)
+        };
+    }
+
     public async Task<SupportTicketDto> AssignTicketAsync(long ticketId, long? assignedAdminId, long adminId)
     {
         var ticket = await _context.SupportTickets
@@ -343,6 +378,16 @@ public class SupportService : ISupportService
 
         if (ticket == null)
             throw new KeyNotFoundException($"Support ticket {ticketId} not found.");
+
+        if (assignedAdminId.HasValue)
+        {
+            var isSuperAdmin = await _context.UserRoles
+                .AnyAsync(ur => ur.UserId == assignedAdminId.Value && ur.Role.Name == "SuperAdmin");
+            if (isSuperAdmin)
+            {
+                throw new InvalidOperationException("SuperAdmins have read-only oversight and cannot be assigned tickets.");
+            }
+        }
 
         ticket.AssignedAdminId = assignedAdminId;
         ticket.UpdatedAt = DateTime.UtcNow;
